@@ -11,9 +11,6 @@ timespec:	resb 16
 	global sleep
 	global sleep_until
 
-%define CLOCK_MONOTONIC 1
-%define TIMER_ABSTIME 1
-
 ; Get the current time (monotonic clock)
 ; cobblers: rdi, rsi, rcx
 ; rax -> seconds
