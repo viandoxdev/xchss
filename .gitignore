@@ -1,3 +1,4 @@
 syscalls.inc
 *.o
 xchess
+.ccls-cache
