@@ -1,0 +1,22 @@
+[default_config]
+version = "0.10.0"
+assembler = "nasm"
+instruction_set = "x86"
+
+[default_config.opts]
+compiler = "cc"
+compile_flags_txt = ["--nostd"]
+diagnostics = true
+default_diagnostics = false
+
+[[project]]
+path = ""
+version = "0.10.0"
+assembler = "nasm"
+instruction_set = "x86"
+
+[project.opts]
+compiler = "cc"
+compile_flags_txt = ["--nostd"]
+diagnostics = true
+default_diagnostics = false
