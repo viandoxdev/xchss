@@ -10,3 +10,5 @@
 
 %define CLOCK_MONOTONIC 1
 %define TIMER_ABSTIME 1
+
+%define POLLIN 1

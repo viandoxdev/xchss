@@ -1,5 +1,5 @@
 ASFLAGS=-f elf64 -F dwarf -g
-LDFLAGS=--nostd
+LDFLAGS=--nostd -z noexecstack
 BIN=xchss
 OBJECTS:=$(patsubst %.asm,%.o,$(wildcard *.asm))
 

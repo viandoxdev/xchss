@@ -1,7 +1,64 @@
 %include "constants.inc"
 	section .bss
+	alignb 8
+drawing_board:
+; address of board to draw
+db_board:		resb 8 ;	(0:8)
+; bitmask of features : 
+;  0b0000000
+;    │││││└┴─ current screen
+;    ││││└─ selected square bit ┐
+;    │││└─ target square bit    │ playing
+;    ││└─ available squares bit │ screen
+;    │└─ capturable pieces bit  │
+;    └─ flip board bit          ╛
+db_features:		resb 2 ; 	(8:2)
+
+%define FLIP_BOARD_BIT 0b1000000
+%define DRAW_CAPTURES_BIT 0b100000
+%define DRAW_MOVES_BIT 0b10000
+%define DRAW_TARGET_BIT 0b1000
+%define DRAW_SELECTED_BIT 0b100
+
+%define DRAW_SCREEN_BITS 0b11
+%define SCREEN_MAIN_MENU 0b00
+%define SCREEN_PLAYING 0b01
+%define SCREEN_PAUSED 0b10
+
+; positions:
+; bytes    0:1
+;       file:rank
+db_selected_square:	resb 2 ; 	(10:2)
+db_target_square:	resb 2 ;	(12:2)
+db_moves_count:		resb 1 ;	(14:1)
+db_captures_count:	resb 1 ;	(15:1)
+; arrays of positions 
+; (see db_selected_square)
+db_moves_squares:	resb 8 ;	(16:8)
+db_captures_squares:	resb 8 ;	(24:8)
+
+%define INPUT_BUFFER_SIZE 4 ; <= 255
+input_buf_used:	resb 1
+input_buf:	resb INPUT_BUFFER_SIZE
+
+	global db_board
+	global db_features
+	global db_selected_square
+	global db_target_square
+	global db_moves_count
+	global db_captures_count
+	global db_moves_squares
+	global db_captures_squares
+
+	global input_buf
+	global input_buf_used
 
 	section .data
+align 8
+pollfd:
+	dd STDIN
+	dw POLLIN
+	dw 0
 
 default_board:
 	db 0b0011001, 0b0000101, 0b0000111, 0b0001011, 0b0001101, 0b0000111, 0b0000101, 0b0011001
@@ -41,6 +98,12 @@ ranks:		db "12345678"
 files:		db "ABCDEFGH"
 
 	extern clear_screen
+	extern set_raw
+	extern enter_alt
+	extern leave_alt
+	extern show_cursor
+	extern unset_raw
+	extern hide_cursor
 	extern get_size
 	extern set_cursor
 	extern qprint_unsigned
@@ -52,44 +115,23 @@ files:		db "ABCDEFGH"
 %define SQUARE_STYLE_MOVE 4
 %define SQUARE_STYLE_CAPTURE 5
 
-%define FLIP_BOARD_BIT 0b10000
-%define DRAW_CAPTURES_BIT 0b1000
-%define DRAW_MOVES_BIT 0b100
-%define DRAW_TARGET_BIT 0b10
-%define DRAW_SELECTED_BIT 0b1
-
 ; Draw draw board 
-; cobblers: rax, rcx, rdx, rdi, rsi, r8, r9
-;  rax -> bitmask of features : 
-;           0b00000
-;             ││││└─ selected square bit
-;             │││└─ target square bit
-;             ││└─ available squares bit
-;             │└─ capturable pieces bit
-;             └─ flip board bit
-;  rdi -> address of the board
-;
-; stack arguments:
-;   offset:size │ meaning
-;           0:1 │ column of selected square
-;           1:1 │ line of selected square
-;           2:1 │ column of target square
-;           3:1 │ line of target square
-;           4:1 │ count of moves squares
-;           5:1 │ count of captures squares
-;           6:2 │ zeros (padding)
-;           8:8 │ address of moves squares array
-;          16:8 │ address of captures squares array
-; arrays:
-;  both arrays are of the following format (2 bytes per element)
-;   0x0000
-;     ││└┴─ (byte) column of square
-;     └┴─ (byte) line of square
+; cobblers: rax, rcx, rdx, rdi, rsi, r8, r9, r10
+; arguments: see db_ symbols
 draw_board:
-	push rax
-	push rdi
+	lea r10, [rel drawing_board]
 
 	call clear_screen
+
+	; check which screen we are onto
+	mov ax, word [r10 + 8]
+	and rax, DRAW_SCREEN_BITS
+
+	cmp rax, SCREEN_PLAYING
+	jne db_paused
+
+	db_playing:
+
 	call get_size
 
 	mov rax, qword [rax]
@@ -104,7 +146,7 @@ draw_board:
 	push rax
 	push rdi
 
-	; Stack now has 4 qwords : features bitflags, board address, column of top right corner, line of top right corner
+	; Stack now has 2 qwords : column of top right corner, line of top right corner
 
 	xor rdi, rdi
 	db_lines_loop:
@@ -113,13 +155,13 @@ draw_board:
 			; rsi is col, rdi is line
 
 			; get piece index in rax (will go on stack on be popped in r8)
-			mov rax, qword [rsp + 16]
+			mov rax, qword [r10]
 			lea rax, [rax + rdi * 8]
 			mov al, byte [rax + rsi]
 			and rax, 0xf
 
 			; load feature flags in r8
-			mov r8, qword [rsp + 24]
+			mov r8, qword [r10 + 8]
 
 			push rdi
 			push rsi
@@ -160,14 +202,14 @@ draw_board:
 			; get current square position in cx (bytes 0-1 of rcx)
 			mov cl, byte [rsp + 8]
 			mov ch, byte [rsp + 16]
-			debug_start:
 
-			mov r8, qword [rsp + 48]
+			; get feature flags in r8
+			mov r8, qword [r10 + 8]
 			test r8, DRAW_SELECTED_BIT
 			jz dblc_style_target
 			
 			; DRAW_SELECTED_BIT is set, check if the current square is selected
-			mov dx, word [rsp + 64]
+			mov dx, word [r10 + 10]
 			cmp cx, dx
 			mov r9, SQUARE_STYLE_SELECTED
 			cmove rax, r9
@@ -177,7 +219,7 @@ draw_board:
 			jz dblc_style_moves
 
 			; DRAW_TARGET_BIT is set, check if the current square is the target
-			mov dx, word [rsp + 66]
+			mov dx, word [r10 + 12]
 			cmp cx, dx
 			mov r9, SQUARE_STYLE_TARGET
 			cmove rax, r9
@@ -189,8 +231,8 @@ draw_board:
 			; DRAW_MOVES_BIT is set, check if the current square is one of the moves squares
 			; get the address of the array in rsi and the last index in rdi
 			xor rdi, rdi
-			mov dil, byte [rsp + 68]
-			mov rsi, qword [rsp + 72]
+			mov dil, byte [r10 + 14]
+			mov rsi, qword [r10 + 16]
 
 			; skip if length is 0
 			dec rdi
@@ -215,8 +257,8 @@ draw_board:
 			; DRAW_CAPTURES_BIT is set, check if the current square is one of the capture squares
 			; get the address of the array in rsi and the last index in rdi
 			xor rdi, rdi
-			mov dil, byte [rsp + 69]
-			mov rsi, qword [rsp + 80]
+			mov dil, byte [r10 + 15]
+			mov rsi, qword [r10 + 24]
 
 			dec rdi
 			js dblc_style_done
@@ -286,7 +328,7 @@ draw_board:
 	mov rsi, 7
 	db_ranks_loop:
 		; load flags in r8
-		mov r8, qword [rsp + 24]
+		mov r8, qword [r10 + 8]
 		push rsi
 
 		and r8, FLIP_BOARD_BIT
@@ -320,7 +362,7 @@ draw_board:
 	mov rsi, 7
 	db_files_loop:
 		; load flags in r8
-		mov r8, qword [rsp + 24]
+		mov r8, qword [r10 + 8]
 		push rsi
 
 		and r8, FLIP_BOARD_BIT
@@ -351,36 +393,100 @@ draw_board:
 		dec rsi
 		jns db_files_loop 
 
-	add rsp, 32
+	add rsp, 16
+
+	ret
+
+	db_paused:
+
+	cmp rax, SCREEN_PAUSED
+	jne db_main_menu
+
+	ret
+
+	db_main_menu:
 
 	ret
 
 	global _start
 _start:
-	mov rax, 0x0100010101020103
-	push rax
-	mov r8, rsp
-	mov rax, 0x020702050103
-	push rax
-	mov r9, rsp
+	; setup screen
+	call hide_cursor
+	call enter_alt
+	call set_raw
 
-	mov rax, 0x030400010000
-	push r9
-	push r8
-	push rax
+	lea rsi, [rel drawing_board]
 
-	mov rax, FLIP_BOARD_BIT | DRAW_CAPTURES_BIT | DRAW_MOVES_BIT | DRAW_TARGET_BIT | DRAW_SELECTED_BIT
-	lea rdi, [rel default_board]
-	call draw_board
+	lea rax, [rel default_board]
+	mov qword [rsi], rax ; board
+	mov word [rsi + 8], SCREEN_PLAYING | FLIP_BOARD_BIT | DRAW_TARGET_BIT | DRAW_SELECTED_BIT ; features
+	mov byte [rsi + 10], 0 ; selected_square file
+	mov byte [rsi + 11], 0 ; selected_square rank
+	mov byte [rsi + 12], 1 ; target_square file
+	mov byte [rsi + 13], 0 ; target_square rank
 
-	add rsp, 40
+	; game loop
+	main_loop:
+		call draw_board
 
-	call get_size
-	mov rax, qword [rax]
-	mov rdx, qword [rdi]
-	dec rax
-	dec rdx
-	call set_cursor
+		; poll stdin with a timeout (to refresh the screen)
+		mov rax, SYS_POLL
+		lea rdi, [rel pollfd]
+		mov rsi, 1
+		mov rdx, 100
+		syscall
+
+		; if rax is 0 the poll ended on timeout, if rax > 0,
+		; there is something to read, if rax < 0, error
+		test rax, rax
+		jz ml_no_input
+
+
+		debug_start:
+		; read the input
+		mov rax, SYS_READ
+		mov rdi, STDIN
+		xor rdx, rdx
+		mov dl, byte [rel input_buf_used]
+		lea rsi, [rel input_buf]
+		; input buffer may not be empty. We also ensure (lower)
+		; that input_buf_used < INPUT_BUFFER_SIZE after each iteration
+		add rsi, rdx
+		neg rdx
+		; we try to get INPUT_BUFFER_SIZE - input_buf_used bytes
+		add rdx, INPUT_BUFFER_SIZE
+		syscall
+
+		add byte [rel input_buf_used], al
+
+		; input needs to be handled:
+		; call out to agents, ...
+
+		; in the meantime: check for escape and end if found
+		; see if we got a single escape byte in read
+		; (if we get more than one byte this is most likely
+		; another keypress)
+		cmp word [rel input_buf_used], 0x1b01
+		je main_loop_end
+
+		mov rdx, FLIP_BOARD_BIT
+		xor rax, rax
+		lea rsi, [rel drawing_board]
+		cmp word [rel input_buf_used], ('a' << 8 | 1)
+		cmove rax, rdx
+		xor [rsi + 8], rax
+
+		mov byte [rel input_buf_used], 0 ; clear input_buf
+
+		ml_no_input:
+		
+		jmp main_loop
+	main_loop_end:
+
+	; leave screen
+	call unset_raw
+	call leave_alt
+	call show_cursor
 
 	mov rax, SYS_EXIT
 	xor rdi, rdi
