@@ -1,3 +1,4 @@
+; Terminal utilities: raw mode, moving cursor, clearing screen, getting size, ...
 %include "constants.inc"
 
 	section .bss

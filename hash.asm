@@ -1,3 +1,4 @@
+; Basic non cryptographic hashing utilities (for now only FxHash, used for position table)
 	section .bss
 fx_hash_value:	resb 8
 	section .text

@@ -1,3 +1,4 @@
+; Utilities to print number (or just converting to string), used for UI and escape sequences
 %include "constants.inc"
 	section .data
 qstrpad:	db "00000000000000000000000000"
