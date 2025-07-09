@@ -49,7 +49,7 @@ pc_process:
 		begin_key %1_ARROW
 
 		; get file/rank in rax, and 1 if FLIP_BOARD_BIT is set, 0 if not in rdx
-		xor rax, rax
+		xor eax, eax
 		mov rdx, FLIP_BOARD_BIT
 		mov al, byte [rsi + 10 + %2]
 		and dx, word [rsi + 8]
@@ -65,7 +65,7 @@ pc_process:
 		%endif
 		
 		; prepare for cmov
-		xor rdi, rdi
+		xor edi, edi
 		mov rcx, 7
 		; add offset and cmov to correct
 		add rax, rdx

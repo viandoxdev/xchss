@@ -11,37 +11,8 @@ table:	resb TABLE_SIZE * 65
 	extern fx_hash
 
 	global posmap_clear
+	global posmap_inc
 
-; Compare two positions (sets ZF=1 if equal)
-; cobblers: r8, r9
-; %1 <- register storing one position's address
-; %2 <- register storing the other position's address
-; ZF -> 1 if they are equal
-%macro cmp_position 2
-	xor r9, r9
-
-	%assign i 0
-	%rep 8
-	mov r8, [%1 + i * 8]
-	xor r8, [%2 + i * 8]
-	or r9, r8
-	%assign i i+1
-	%endrep
-
-	test r8, r8
-%endmacro
-; Move one position into another
-; cobblers: r8
-; %1 <- destination address
-; %2 <- source address
-%macro mov_position 2
-	%assign i 0
-	%rep 8
-	mov r8, qword [%2 + i * 8]
-	mov qword [%1 + i * 8], r8
-	%assign i i+1
-	%endrep
-%endmacro
 ; Clears the position map
 ; cobblers: rsi, rdi
 posmap_clear:
@@ -102,7 +73,7 @@ posmap_inc:
 		jne pmi_next_probe
 
 		; load count in rax, increment, store and return
-		xor rax, rax
+		xor eax, eax
 		mov al, byte [rcx - 1]
 		inc rax
 		mov byte [rcx - 1], al

@@ -53,14 +53,23 @@ pollfd:
 	dw 0
 
 default_board:
-	db 0b0011001, 0b0000101, 0b0000111, 0b0001011, 0b0001101, 0b0000111, 0b0000101, 0b0011001
-	db 0b0000011, 0b0000011, 0b0000011, 0b0000011, 0b0000011, 0b0000011, 0b0000011, 0b0000011
-	db 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000
-	db 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000
-	db 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000
-	db 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000
-	db 0b0000010, 0b0000010, 0b0000010, 0b0000010, 0b0000010, 0b0000010, 0b0000010, 0b0000010
-	db 0b0011000, 0b0000100, 0b0000110, 0b0001010, 0b0001100, 0b0000110, 0b0000100, 0b0011000
+	db Pr, Pn, Pb, Pq, Pk, Pb, Pn, Pr
+	db Pp, Pp, Pp, Pp, Pp, Pp, Pp, Pp
+	db P_, P_, P_, P_, P_, P_, P_, P_
+	db P_, P_, P_, P_, P_, P_, P_, P_
+	db P_, P_, P_, P_, P_, P_, P_, P_
+	db P_, P_, P_, P_, P_, P_, P_, P_
+	db PP, PP, PP, PP, PP, PP, PP, PP
+	db PR, PN, PB, PQ, PK, PB, PN, PR
+default_board_attacks:
+	db Pr__, Pn_b, Pb_b, Pq_b, Pk_b, Pb_b, Pn_b, Pr__
+	db Pp_b, Pp_b, Pp_b, Pp_b, Pp_b, Pp_b, Pp_b, Pp_b
+	db P__b, P__b, P__b, P__b, P__b, P__b, P__b, P__b
+	db P___, P___, P___, P___, P___, P___, P___, P___
+	db P___, P___, P___, P___, P___, P___, P___, P___
+	db P_w_, P_w_, P_w_, P_w_, P_w_, P_w_, P_w_, P_w_
+	db PPw_, PPw_, PPw_, PPw_, PPw_, PPw_, PPw_, PPw_
+	db PR__, PNw_, PBw_, PQw_, PKw_, PBw_, PNw_, PR__
 
 	section .text
 
@@ -101,6 +110,9 @@ files:		db "ABCDEFGH"
 	extern qprint_unsigned
 	extern pop_keystroke
 	extern pc_process
+	extern resolve_immediate_attacks
+	extern posmap_inc
+	extern posmap_clear
 
 %define SQUARE_STYLE_WHITE 0
 %define SQUARE_STYLE_BLACK 1
@@ -144,9 +156,9 @@ draw_board:
 
 	; Stack now has 2 qwords : column of top right corner, line of top right corner
 
-	xor rdi, rdi
+	xor edi, edi
 	db_lines_loop:
-		xor rsi, rsi
+		xor esi, esi
 		db_columns_loop:
 			; rsi is col, rdi is line
 
@@ -192,8 +204,8 @@ draw_board:
 			; square features
 
 			; we will put the current square in cx, and the square to match against in dx
-			xor rcx, rcx
-			xor rdx, rdx
+			xor ecx, ecx
+			xor edx, edx
 
 			; get current square position in cx (bytes 0-1 of rcx)
 			mov cl, byte [rsp + 8]
@@ -226,7 +238,7 @@ draw_board:
 
 			; DRAW_MOVES_BIT is set, check if the current square is one of the moves squares
 			; get the address of the array in rsi and the last index in rdi
-			xor rdi, rdi
+			xor edi, edi
 			mov dil, byte [r10 + 14]
 			mov rsi, qword [r10 + 16]
 
@@ -252,7 +264,7 @@ draw_board:
 
 			; DRAW_CAPTURES_BIT is set, check if the current square is one of the capture squares
 			; get the address of the array in rsi and the last index in rdi
-			xor rdi, rdi
+			xor edi, edi
 			mov dil, byte [r10 + 15]
 			mov rsi, qword [r10 + 24]
 
@@ -463,5 +475,5 @@ _start:
 	call show_cursor
 
 	mov rax, SYS_EXIT
-	xor rdi, rdi
+	xor edi, edi
 	syscall

@@ -24,7 +24,7 @@ qstr_rev:
 	; rax is the left end index
 	; rdx is the right end index
 	; r8 is the pointer
-	xor rax, rax
+	xor eax, eax
 	dec rdx
 
 qstrrevloop:
@@ -54,10 +54,10 @@ qstring_unsigned:
 	mov rdi, 10
 
 	; rsi holds the length
-	xor rsi, rsi
+	xor esi, esi
 
 qstruloop:
-	xor rdx, rdx
+	xor edx, edx
 
 	; rax <- rax / 10
 	; rdx <- rax % 10
@@ -93,9 +93,9 @@ qstring_signed:
 	cmovs rcx, rax
 
 	mov rdi, 10
-	xor rsi, rsi
+	xor esi, esi
 qstrsloop:
-	xor rdx, rdx
+	xor edx, edx
 	div rdi
 	add rdx, 48
 	mov byte [r8 + rsi], dl
@@ -107,7 +107,7 @@ qstrsloop:
 	; add minus sign at the end of the string
 	mov byte [r8 + rsi], '-'
 	; rdi is 0, rdx is 1
-	xor rdi, rdi
+	xor edi, edi
 	mov rdx, 1
 	; set rdi to 1 if rcx is negative (rcx is the original number)
 	test rcx, rcx

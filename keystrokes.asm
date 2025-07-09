@@ -13,9 +13,9 @@
 ; cobblers: rax, rdx, rsi, rdi
 ; rax -> keystroke id (see KEY_ macros), or 0 if none
 pop_keystroke:
-	xor rdi, rdi
-	xor rax, rax
-	xor rdx, rdx
+	xor edi, edi
+	xor eax, eax
+	xor edx, edx
 
 	; load address of buffer and size (number of bytes is used - offset)
 	mov dil, byte [rel input_buf_used]
@@ -29,7 +29,7 @@ pop_keystroke:
 	; no keystrokes, clear out buffer and return 0
 	mov byte [rel input_buf_offset], 0
 	mov byte [rel input_buf_used], 0
-	xor rax, rax
+	xor eax, eax
 	ret
 
 	pk_bytes_available:
@@ -41,7 +41,7 @@ pop_keystroke:
 	cmp rdi, KEY_%[i]_LEN
 	jl pk_%[i]_end
 
-	xor rdx, rdx
+	xor edx, edx
 
 	; match each byte individually: we don't  do conditionals here
 	; we just xor every byte and or all the results. If the result is 0

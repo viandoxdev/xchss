@@ -46,7 +46,7 @@ merge_timestamp:
 ; rax -> seconds
 ; rdx -> nano seconds
 split_timestamp:
-	xor rdx, rdx
+	xor edx, edx
 	mov rdi, 1000000000
 	div rdi
 	ret
@@ -62,9 +62,9 @@ sleep:
 
 	mov rax, SYS_CLOCK_NANOSLEEP
 	mov rdi, CLOCK_MONOTONIC
-	xor rsi, rsi
+	xor esi, esi
 	lea rdx, [rel timespec]
-	xor r10, r10
+	xor r10d, r10d
 	syscall
 
 	ret
@@ -82,7 +82,7 @@ sleep_until:
 	mov rdi, CLOCK_MONOTONIC
 	mov rsi, TIMER_ABSTIME
 	lea rdx, [rel timespec]
-	xor r10, r10
+	xor r10d, r10d
 	syscall
 
 	ret

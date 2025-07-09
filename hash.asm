@@ -49,7 +49,7 @@ fx_hasher_finish:
 ; rax <- hash
 fx_hash:
 	; hasher state in rax
-	xor rax, rax
+	xor eax, eax
 
 	; loop hash as many 8 bytes as possible
 	fhg8:
@@ -69,7 +69,6 @@ fx_hash:
 	cmp rdi, 4
 	jl fhl4
 
-	xor rdx, rdx ; technically unnecessary, but here for my sanity
 	mov edx, dword [rsi]
 	fx_hash_rdx_into_rax
 	sub rdi, 4
@@ -80,7 +79,7 @@ fx_hash:
 	cmp rdi, 2
 	jl fhl2
 
-	xor rdx, rdx
+	xor edx, edx
 	mov dx, word [rsi]
 	fx_hash_rdx_into_rax
 	sub rdi, 2
@@ -91,7 +90,7 @@ fx_hash:
 	cmp rdi, 1
 	jl fhl1
 
-	xor rdx, rdx
+	xor edx, edx
 	mov dl, byte [rsi]
 	fx_hash_rdx_into_rax
 	dec rdi
