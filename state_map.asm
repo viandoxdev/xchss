@@ -1,5 +1,6 @@
 ; This file handles the position hashmap for the threefold repetition rule (https://en.wikipedia.org/wiki/Threefold_repetition)
 ; A position is represented by a 64 byte binary string.
+%include "constants.inc"
 
 ; Must be multiple of 8
 %define TABLE_MASK 0x1FF

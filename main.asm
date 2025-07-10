@@ -1,5 +1,6 @@
 %include "constants.inc"
 	section .bss
+moves_buffer:		resb 32
 	alignb 8
 drawing_board:
 ; address of board to draw
@@ -53,15 +54,6 @@ pollfd:
 	dw 0
 
 default_board:
-	db Pr, Pn, Pb, Pq, Pk, Pb, Pn, Pr
-	db Pp, Pp, Pp, Pp, Pp, Pp, Pp, Pp
-	db P_, P_, P_, P_, P_, P_, P_, P_
-	db P_, P_, P_, P_, P_, P_, P_, P_
-	db P_, P_, P_, P_, P_, P_, P_, P_
-	db P_, P_, P_, P_, P_, P_, P_, P_
-	db PP, PP, PP, PP, PP, PP, PP, PP
-	db PR, PN, PB, PQ, PK, PB, PN, PR
-default_board_attacks:
 	db Pr__, Pn_b, Pb_b, Pq_b, Pk_b, Pb_b, Pn_b, Pr__
 	db Pp_b, Pp_b, Pp_b, Pp_b, Pp_b, Pp_b, Pp_b, Pp_b
 	db P__b, P__b, P__b, P__b, P__b, P__b, P__b, P__b
@@ -110,9 +102,11 @@ files:		db "ABCDEFGH"
 	extern qprint_unsigned
 	extern pop_keystroke
 	extern pc_process
-	extern resolve_immediate_attacks
 	extern posmap_inc
 	extern posmap_clear
+	extern resolve_immediate_attacks
+	extern apply_move
+	extern generate_moves
 
 %define SQUARE_STYLE_WHITE 0
 %define SQUARE_STYLE_BLACK 1
@@ -151,8 +145,6 @@ draw_board:
 
 	push rax
 	push rdi
-
-	;TODO: Moves stuff, available moves, keep track of immediate attacks in game state (update default_board to match)
 
 	; Stack now has 2 qwords : column of top right corner, line of top right corner
 
@@ -418,6 +410,11 @@ draw_board:
 
 	global _start
 _start:
+	mov rax, 6 << 8 | 3
+	lea rdi, [rel moves_buffer]
+	lea rsi, [rel default_board]
+	call generate_moves
+
 	; setup screen
 	call hide_cursor
 	call enter_alt

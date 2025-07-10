@@ -2,6 +2,13 @@
 %use ifunc
 %include "constants.inc"
 
+	section .bss
+
+moves_buffer:		resb 32
+moves_buffer_len:	resb 1
+
+	section .text
+
 	global pc_setup
 	global pc_process
 
@@ -16,6 +23,11 @@ pc_setup:
 ; cobblers: rax, rdx, rcx, rdi, rsi
 ; rax -> AGENT_ value
 pc_process:
+	; save features (to check for changes)
+	xor eax, eax
+	mov ax, word [rel db_features]
+	push rax
+
 	pcp_input_loop:
 		call pop_keystroke
 		test rax, rax
@@ -121,5 +133,18 @@ pc_process:
 		jmp pcp_input_loop
 
 	pcp_end:
+
+	xor eax, eax
+	mov ax, word [rel db_features]
+	and ax, DRAW_TARGET_BIT
+	xor ax, word [rsp] ; compare DRAW_TARGET_BIT before and after input
+	test ax, word [rsp] 
+	jz pcp_moves_done
+
+	; DRAW_TARGET_BIT was turned on, we need to generate moves
+	
+
+	pcp_moves_done:
+
 	mov rax, AGENT_CONTINUE
 	ret

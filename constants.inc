@@ -24,6 +24,8 @@
 %define SCREEN_PLAYING 0b01
 %define SCREEN_PAUSED 0b10
 
+%define BROADCAST_BQ 0x0101010101010101
+
 ; enum for agent_process return value
 %define AGENT_CONTINUE 0 ; agent isn't finished with turn, continue
 %define AGENT_FINISHED 1 ; move has been decided
@@ -62,6 +64,12 @@
 ;  0b11000000
 ;    ││  └┴┴── piece type
 ;    └┴─ type (promotion [11])
+;
+; In the case of en passant: the destination square
+;   is the square the taking pawn ends up to (not
+;   the square where the taken pawn is).
+; In the case of castling: the destination square
+;   is the square the matching rook lies on.
 
 %define MOVE_FILE_BITS		0b00000111
 %define MOVE_RANK_BITS		0b00111000
@@ -161,4 +169,20 @@ define_key ENTER,	0x10
 	%endrep
 
 	test r8, r8
+%endmacro
+
+; push many registers (in order)
+%macro push_many 1-*
+%rep %0
+push %1
+%rotate 1
+%endrep
+%endmacro
+
+; pop many registers (in reverse order)
+%macro pop_many 1-*
+%rep %0
+%rotate -1
+pop %1
+%endrep
 %endmacro
