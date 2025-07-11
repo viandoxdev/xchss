@@ -13,11 +13,15 @@
 
 %define POLLIN 1
 
-%define FLIP_BOARD_BIT 0b1000000
-%define DRAW_CAPTURES_BIT 0b100000
-%define DRAW_MOVES_BIT 0b10000
-%define DRAW_TARGET_BIT 0b1000
-%define DRAW_SELECTED_BIT 0b100
+%define FLIP_BOARD_BIT 0b100
+%define DRAW_IMMEDIATE_BIT 0b1000
+
+%define SQUARE_STYLE_WHITE 0
+%define SQUARE_STYLE_BLACK 1
+%define SQUARE_STYLE_SELECTED 2
+%define SQUARE_STYLE_TARGET 3
+%define SQUARE_STYLE_MOVE 4
+%define SQUARE_STYLE_CAPTURE 5
 
 %define DRAW_SCREEN_BITS 0b11
 %define SCREEN_MAIN_MENU 0b00
@@ -53,6 +57,7 @@
 %define PIECE_KING		0b00001100
 %define PIECE_SPECIAL_BIT	0b00010000
 %define PIECE_ATTACK_BITS	0b11000000
+%define PIECE_ATTACK_OFFSET	6
 %define PIECE_ATTACK_WHITE	0b01000000
 %define PIECE_ATTACK_BLACK	0b10000000
 
@@ -77,6 +82,7 @@
 %define MOVE_RANK_OFFSET	3
 %define MOVE_PIECE_TYPE_BITS	0b00001110
 %define MOVE_TYPE_BITS		0b11000000
+%define MOVE_TYPE_OFFSET	6
 %define MOVE_TYPE_MOVE		0b00000000
 %define MOVE_TYPE_CAPTURE	0b01000000
 %define MOVE_TYPE_CASTLE	0b10000000
@@ -136,8 +142,9 @@ define_key RIGHT_ARROW,	0x1b, '[', 'C'
 define_key LEFT_ARROW,	0x1b, '[', 'D'
 define_key ESC,		0x1b ; needs to be put after any other key starting with 0x1b
 define_key A,		'a'
+define_key B,		'b'
 define_key SPACE,	' '
-define_key ENTER,	0x10
+define_key ENTER,	0x0A
 
 ; Move one position into another
 ; cobblers: r8

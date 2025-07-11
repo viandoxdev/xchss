@@ -68,18 +68,27 @@ resolve_immediate_attacks:
 		; rdi <- piece file
 		; rsi <- piece rank
 		%macro attack 2
-		cmp rdi, -%1
-		jl %%skip
-		cmp rdi, 7 - %1
-		jg %%skip
-		cmp rsi, -%2
-		jl %%skip
-		cmp rsi, 7 - %2
-		jg %%skip
+			; check x bounds
+			%if %1 < 0
+				cmp rdi, -%1
+				jl %%skip
+			%elif %1 > 0
+				cmp rdi, 7 - %1
+				jg %%skip
+			%endif
 
-		lea rdx, [rax + rsi * 8 + (%2 * 8)]
-		or byte [rdx + rdi + %1], cl
-		%%skip:
+			; check y bounds
+			%if %2 < 0
+				cmp rsi, -%2
+				jl %%skip
+			%elif %2 > 0
+				cmp rsi, 7 - %2
+				jg %%skip
+			%endif
+
+			lea rdx, [rax + rsi * 8 + (%2 * 8)]
+			or byte [rdx + rdi + %1], cl
+			%%skip:
 		%endmacro
 
 		; set piece attack bit depending on color, 
@@ -92,33 +101,41 @@ resolve_immediate_attacks:
 		; rdi <- piece file
 		; rsi <- piece rank
 		%macro attack_line 2
-		mov r8, rdi
-		mov r9, rsi
+			mov r8, rdi
+			mov r9, rsi
 
-		%%loop:
-		; check if would be out of bounds
-		cmp r8, -%1
-		jl %%end
-		cmp r8, 7 - %1
-		jg %%end
-		cmp r9, -%2
-		jl %%end
-		cmp r9, 7 - %2
-		jg %%end
+			%%loop:
+			; check x bounds
+			%if %1 < 0
+				cmp r8, -%1
+				jl %%end
+			%elif %1 > 0
+				cmp r8, 7 - %1
+				jg %%end
+			%endif
 
-		; increment
-		add r8, %1
-		add r9, %2
+			; check y bounds
+			%if %2 < 0
+				cmp r9, -%2
+				jl %%end
+			%elif %2 > 0
+				cmp r9, 7 - %2
+				jg %%end
+			%endif
 
-		; set attack bit
-		lea rdx, [rax + r9 * 8]
-		or byte [rdx + r8], cl
-		; load piece in dl, continue while no piece
-		mov dl, byte [rdx + r8]
-		test dl, PIECE_TYPE_BITS
-		jz %%loop
+			; increment
+			add r8, %1
+			add r9, %2
 
-		%%end:
+			; set attack bit
+			lea rdx, [rax + r9 * 8]
+			or byte [rdx + r8], cl
+			; load piece in dl, continue while no piece
+			mov dl, byte [rdx + r8]
+			test dl, PIECE_TYPE_BITS
+			jz %%loop
+
+			%%end:
 		%endmacro
 		
 		ria_piece_white_pawn:
@@ -197,12 +214,10 @@ resolve_immediate_attacks:
 ; ax <- square where the piece doing the move is
 ; dl <- move
 apply_move:
-	mov dl, cl
-	and rcx, MOVE_TYPE_BITS
 
 	; get source file in rax and source rank in rdi
 	xor edi, edi
-	mov al, r8b
+	mov r8b, al
 	mov al, ah
 	mov dil, al
 	xor eax, eax
@@ -210,26 +225,28 @@ apply_move:
 
 	; save moving piece on stack, we will need it later
 	; to update the special bits after the moves
-	lea rdx, [rsi + rdi * 8]
-	mov dl, byte [rdx + rax]
-	movzx rdx, dl
-	push rdx
+	lea rcx, [rsi + rdi * 8]
+	movzx rcx, byte [rcx + rax]
+	push rcx
 
 	; get destination file and ranks
 	; dl <- move (not promotion)
 	; r8 -> destination file
 	; r9 -> destination rank
 	%macro unpack_dest 0
-	xor r8d, r8d
-	xor r9d, r9d
+		xor r8, r8
+		xor r9, r9
 
-	mov r8b, dl
-	mov r9b, dl
-	and r8b, MOVE_FILE_BITS
-	and r9b, MOVE_RANK_BITS
-	shr r8b, MOVE_FILE_OFFSET
-	shr r9b, MOVE_RANK_OFFSET
+		mov r8b, dl
+		mov r9b, dl
+		and r8b, MOVE_FILE_BITS
+		and r9b, MOVE_RANK_BITS
+		shr r8b, MOVE_FILE_OFFSET
+		shr r9b, MOVE_RANK_OFFSET
 	%endmacro
+
+	mov cl, dl
+	and rcx, MOVE_TYPE_BITS
 
 	am_move_move:
 	cmp rcx, MOVE_TYPE_MOVE
@@ -241,18 +258,21 @@ apply_move:
 		lea rdx, [rsi + rdi * 8]
 		mov cl, byte [rdx + rax]
 
+		; check if pawn (to set special bit for en passant)
 		mov rdx, PIECE_TYPE_BITS
 		and dl, cl
 		cmp dl, PIECE_PAWN
 		jne ammm_continue
 
-		mov rdx, rdi
-		sub rdx, r9 ; get rank difference into rdx
-		test rdx, 1
-		jnz ammm_continue ; check parity of result
-
-		; even number of squares : double advance
-		or cl, PIECE_SPECIAL_BIT ; enable special bit (for en passant)
+		; we have a pawn, now we check the parity of the number
+		; of ranks traveled to enable the bit
+		lea rdx, [rdi + 1] ; source rank + 1 (to invert parity)
+		sub rdx, r9 ; difference is even for single move, odd for double
+		and rdx, 1
+		; get PIECE_SPECIAL_BIT set in rdx if the move crosses an even
+		; number of ranks
+		shl rdx, ilog2(PIECE_SPECIAL_BIT)
+		or cl, dl ; enable special bit (if needed)
 		
 		ammm_continue:
 
@@ -286,7 +306,7 @@ apply_move:
 		xchg cl, byte [rdx + r8]
 
 		; test if we captured on an empty square
-		test cl, cl
+		test cl, PIECE_TYPE_BITS
 		jnz am_move_end
 
 		; we have, we must be taking en passant.
@@ -392,7 +412,7 @@ apply_move:
 	punpckldq xmm2, xmm2
 
 	; get mask (flips special bit)
-	mov rcx, (PIECE_BITS ^ PIECE_ATTACK_BITS) * BROADCAST_BQ
+	mov rcx, PIECE_SPECIAL_BIT * BROADCAST_BQ
 	movq xmm4, rcx
 	punpckldq xmm4, xmm4
 
@@ -514,14 +534,14 @@ generate_moves:
 		; if not handle en passant
 
 		; load piece at square one before destination
-		lea rcx, [rsi + r9 * 8 + (%2 - 1) * 8]
+		lea rcx, [rsi + r9 * 8]
 		mov cl, byte [rcx + r8 + %1]
-		and cl, (PIECE_BITS ^ PIECE_ATTACK_BITS) ; discard attack information
+		and cl, PIECE_BITS ^ PIECE_ATTACK_BITS ; discard attack information
 
 		; get piece match in bl, we want a pawn of the opposing color that
 		; has the special bit set (can be taken en passant)
 		mov bl, PIECE_COLOR_BIT
-		and bl, cl
+		and bl, dl
 		xor bl, PIECE_COLOR_BIT ; get opposing color bit in bl
 		or bl, PIECE_PAWN | PIECE_SPECIAL_BIT
 
@@ -883,6 +903,8 @@ generate_moves:
 		lea rdx, [rsi + r9 * 8]
 		mov cl, byte [rdx + r8]
 		and cl, PIECE_COLOR_BIT
+
+		lea rsi, [rel board]
 		
 		; update attack mask depending on color
 		shl rax, cl
@@ -951,3 +973,5 @@ generate_moves:
 	sub rax, rdx
 	neg rax
 	ret
+
+; TODO: Fix castling : apply move is wrong and I don't check if there are pieces between the rook and the king before generating the move.
