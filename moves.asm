@@ -341,11 +341,12 @@ apply_move:
 		; take king from source square
 		lea rdx, [rsi + rdi * 8]
 		lea rdx, [rdx + rax]
+
 		mov cl, byte [rdx]
 		mov byte [rdx], 0
 
 		; place king back 2 squares away from source
-		mov cl, byte [rdx + rbx * 2]
+		mov byte [rdx + rbx * 2], cl
 
 		; take rook from destination square
 		lea r9, [rsi + r9 * 8]
@@ -783,78 +784,91 @@ generate_moves:
 		move_off  1,  1, 3
 
 		%macro castles 1
-		; get color in cl
-		mov dl, cl
-		and cl, PIECE_COLOR_BIT
-		; get ATTACK bit mask for the whole rank
-		mov rbx, PIECE_ATTACK_BLACK * BROADCAST_BQ
-		shr rbx, cl
-
-		; load attack bits into rbx
-		and rbx, qword [rsi + r9 * 8]
-		shl rbx, cl ; collapse branches
-		
-		; we want to get only the 3 squares we care about
-		; in the low bytes of rbx:
-		; king square, passing square, destination square
-
-		%if %1 < 0 ; compute shifts depending on side
-			mov rcx, r8
-			sub rcx, 2
-		%else
-			; same logic
-			mov rcx, r8
-		%endif
-
-		; shift and test
-		shl rcx, 3
-		shr rbx, cl
-		and rbx, 0xFFFFFF
-		; check if any of the opposing attak bits are set on these squares
-		test rbx, rbx
-		jnz %%skip_castle ; can't castle if under attack
-
-		mov rbx, r8
-		%%loop:
-			; load piece in cl, discard attack information
-			lea rcx, [rsi + r9 * 8]
-			mov cl, byte [rcx + rbx]
-			and cl, (PIECE_BITS ^ PIECE_ATTACK_BITS)
+			; check if there is enough space to castle
+			%if %1 < 0
+				cmp r8, 2
+				jl %%skip_castle
+			%else
+				cmp r8, 5
+				jg %%skip_castle
+			%endif
 			
-			; build match rook
-			push rbx
-			mov bl, PIECE_COLOR_BIT
-			and bl, cl ; load piece color in bl
-			or bl, PIECE_SPECIAL_BIT | PIECE_ROOK
+			; get color in cl
+			mov cl, dl
+			and cl, PIECE_COLOR_BIT
+			; get ATTACK bit mask for the whole rank
+			mov rbx, PIECE_ATTACK_BLACK * BROADCAST_BQ
+			shr rbx, cl
 
-			cmp cl, bl
-			jne %%next
+			; load attack bits into rbx
+			and rbx, qword [rsi + r9 * 8]
+			shl rbx, cl ; collapse branches
+			
+			; we want to get only the 3 squares we care about
+			; in the low bytes of rbx:
+			; king square, passing square, destination square
+
+			%if %1 < 0 ; compute shifts depending on side
+				mov rcx, r8
+				sub rcx, 2
+			%else
+				; same logic
+				mov rcx, r8
+			%endif
+
+			; shift and test
+			shl rcx, 3
+			shr rbx, cl
+			and rbx, 0xFFFFFF
+			; check if any of the opposing attak bits are set on these squares
+			test rbx, rbx
+			jnz %%skip_castle ; can't castle if under attack
+
+			mov rbx, r8
+			add rbx, %1
+			%%loop:
+				; load piece in cl, discard attack information
+				lea rcx, [rsi + r9 * 8]
+				mov cl, byte [rcx + rbx]
+				and cl, (PIECE_BITS ^ PIECE_ATTACK_BITS)
+
+				test cl, PIECE_TYPE_BITS
+				jnz %%found_piece ; empty square, look further
+
+				add rbx, %1
+				%if %1 < 0
+					js %%skip_castle
+				%else
+					cmp rbx, 7
+					jg %%skip_castle
+				%endif
+
+				jmp %%loop
+
+			%%found_piece:
+			; We have a piece, let's see if it is a rook
+
+			; build match rook in al
+			mov al, PIECE_COLOR_BIT
+			and al, cl ; load piece color in bl
+			or al, PIECE_SPECIAL_BIT | PIECE_ROOK
+
+			cmp cl, al
+			jne %%skip_castle
 
 			; we found such a rook
 
 			; get move in cl
 			mov rcx, r9
 			shl rcx, MOVE_RANK_OFFSET
-			or cl, byte [rsp]
+			or cl, bl
 			or rcx, MOVE_TYPE_CASTLE
 
 			; push move
 			mov byte [rdi], cl
 			inc rdi
 
-			%%next:
-			pop rbx
-			add rbx, %1
-			
-			%if %1 < 0
-				jns %%loop
-			%else
-				cmp rbx, 7
-				jle %%loop
-			%endif
-
-		%%skip_castle:
-		
+			%%skip_castle:
 		%endmacro
 
 		castles -1 ; left
